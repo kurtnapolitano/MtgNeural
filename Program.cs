@@ -14,6 +14,7 @@ namespace MtgNeural
     {
         private static void Main(string[] args)
         {
+            // these actually aren't used until the end.  These are our arbitary validation examples.
             var testValues = new[] {
                 "Trample",
                 "Flying trample",
@@ -34,19 +35,22 @@ namespace MtgNeural
                 "prevent bolster hexproof"
             };
 
-            var cards = MtgDataLoader.GetAllCards(@"C:\Users\napol\MagicAssistantWorkspace\magiccards\MagicDB");
-            
             // create a neural network, without using a factory
             BasicLayer inputLayer, hidden, hidden2;
             var network = new BasicNetwork();
             network.AddLayer(inputLayer = new BasicLayer(null, true, MtgDataLoader.InputVectorCount));
             network.AddLayer(hidden = new BasicLayer(new ActivationSigmoid(), true, 18)); // MtgDataLoader.InputVectorCount * MtgDataLoader.InputVectorCount));
             network.AddLayer(new BasicLayer(new ActivationSigmoid(), false, 5));
+            hidden.ContextFedBy = inputLayer;
             network.Structure.FinalizeStructure();
             network.Reset();
 
+
+            // load all of the cards from the MagicAssistant library
+            var cards = MtgDataLoader.GetAllCards(@"C:\Users\napol\MagicAssistantWorkspace\magiccards\MagicDB");
+
+            // build inputs and ideals
             var mtgData = new MtgDataLoader(cards);
-            
             var input = mtgData.Inputs;
             var ideal = mtgData.Ideals;
             
@@ -68,6 +72,7 @@ namespace MtgNeural
 
                 epoch++;
 
+                // if we're not below 1% after 600 iterations (highly unlikely) just bow out.
                 if(epoch > 600)
                 {
                     break;
@@ -92,8 +97,11 @@ namespace MtgNeural
                 {
                     outputArray[i] = output2[i];
                 }
+
+                // Shiny pretty console display
                 Console.WriteLine($"{tv.PadLeft(40, ' ')} = :  {MtgDataLoader.ConvertOutputToCardColors(outputArray).PadLeft(5, ' ')} --- W: {outputArray[0]:0.0000}  U: {outputArray[1]:0.0000}, B: {outputArray[2]:0.0000}, R: {outputArray[3]:0.0000}, G: {outputArray[4]:0.0000}");
             }
+
             EncogFramework.Instance.Shutdown();
             Console.ReadLine();
         }
