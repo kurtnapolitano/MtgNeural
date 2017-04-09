@@ -17,8 +17,11 @@ namespace MtgNeural
             "undying", "wither", "flash", "menace", "prowess", "reach", "flying",
             "hexproof", "lifelink", "sacrifice", "dies", "graveyard", "draw", "indestructible",
             "haste", "evolve", "return", "hand", "persist", "infect", "bolster", "protection",
-            "prevent"
+            "prevent", "token", "dash", "proliferate", "defender", "destroy target", "transform",
+            "unblockable"
         };
+
+        private static int MaxManaCost = 15;
 
         private double[][] _inputs;
         private double[][] _ideals;
@@ -88,7 +91,7 @@ namespace MtgNeural
             return result;
         }
 
-        public static int InputVectorCount { get { return _keywords.Count; } }
+        public static int InputVectorCount { get { return _keywords.Count + MaxManaCost; } }
 
         public MtgDataLoader(List<InputCard> cards)
         {
@@ -136,7 +139,7 @@ namespace MtgNeural
 
         // We can convert output data into a color string based on whether each output neuron exceeds our set threshold.
 
-        private static double _colorValidationThreshold = 0.4;
+        private static double _colorValidationThreshold = 0.5;
         public static string ConvertOutputToCardColors(double[] output)
         {
             var result = "";
@@ -155,7 +158,7 @@ namespace MtgNeural
         /// </summary>
         private InputOutputPair ConvertCardToPair(InputCard card)
         {
-            double[] inputs = GenerateInputs(card.RulesText ?? "");
+            double[] inputs = GenerateInputs(card);
 
             if(inputs == null)
             {
@@ -189,7 +192,7 @@ namespace MtgNeural
         /// <summary>
         /// Use the card cost to create a converted mana cost neuron -- this method is currently unused
         /// </summary>
-        private static double? GetCMCNuron(string cardCost)
+        private static int? GetCmc(string cardCost)
         {
             //example: {4}{W}{W}
 
@@ -221,24 +224,26 @@ namespace MtgNeural
             }
 
             // there are stupid unhinged and unglued cards, they'll mess everythign up.  Nothing over 15.
-            if (cmc > 15)
+            if (cmc > MaxManaCost)
                 return null;
 
-            // technically we should be normalizing over -1.0,1.0 but seeing as how all the other input neurons
-            // are either 0 or 1, we'll likely be using a sigmoid activation function which doesn't go into negatives
-            // so lets just stay away from there.  Okay?
-            return (double)cmc / 15.0f;
+            return cmc;
+        }
+
+        public static double[] GenerateInputs(string cost, string rulesText)
+        {
+            return GenerateInputs(new InputCard { Cost = cost, RulesText = rulesText });
         }
 
         /// <summary>
         /// Parse the oracle text for any keywords and light up those neurons
         /// </summary>
-        public static double[] GenerateInputs(string rulesText)
+        private static double[] GenerateInputs(InputCard card)
         {
-            var result = new double[_keywords.Count];
+            var result = new double[InputVectorCount];
             for (int i = 0; i < _keywords.Count; i++)
             {
-                result[i] = rulesText.ToLower().Contains(_keywords[i]) ? 1.0 : 0.0;
+                result[i] = (card.RulesText??"").ToLower().Contains(_keywords[i]) ? 1.0 : 0.0;
             }
 
             // if the card is a dud, like a vanilla card or something stupid that doesn't do anything useful like
@@ -248,6 +253,24 @@ namespace MtgNeural
                 return null;
             }
 
+            var cmc = GetCmc(card.Cost);
+            
+            if(!cmc.HasValue)
+            {
+                return null;
+            }
+
+            for(int i = _keywords.Count; i< InputVectorCount; i++)
+            {
+                if(i == _keywords.Count + cmc.Value)
+                {
+                    result[i] = 1.0;
+                }
+                else
+                {
+                    result[i] = 0.0;
+                }
+            }
             return result;
         }
 
